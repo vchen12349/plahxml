@@ -23,5 +23,8 @@ object main {
       xmlObj)
 
     println(worldpayRequest)
+    println("curenty" + worldpayRequest.currency.get)
+    println(s"zipcode ${worldpayRequest.be.get.zip.get.somezip.get}")
+    println(s"Pament type ${worldpayRequest.paymentType.get.paymentType.get}")
   }
 }
