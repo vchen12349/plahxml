@@ -1,19 +1,27 @@
 import java.lang.reflect.Constructor
 import javax.lang.model.`type`.TypeVariable
 import scala.collection.mutable.ListBuffer
+import scala.reflect.{ClassTag, api, classTag}
 import scala.reflect.runtime.{universe => ru}
 import scala.xml.{Elem, NodeSeq}
+import scala.reflect.runtime.universe._
 
 object fromXmlTemplate {
-  def fromXML(c: Class[_], elem:NodeSeq  ): XMLTextTemplate = {
-    val mirror = ru.runtimeMirror(getClass.getClassLoader())
+  val mirror = ru.runtimeMirror(getClass.getClassLoader())
+
+  def fromXML[T: TypeTag: ClassTag](/*c: Class[T],*/ elem:NodeSeq  ): T = {
     println(s" --- BEGIN UGH ---")
+//TypeTag
+     val t =  typeTag[T]
 
-
-    println(elem)
+    val tpe = t.tpe
+//    val t = classTag[T].runtimeClass
+    println(s"classtag: ${t.tpe}")
     //    val requestType = mirror.classSymbol(c.getClass).toType
-    println(getType(c))
-    val requestType = getType(c)
+//    println(getType(tmpClass.getClass))
+//    println(getType(c))
+//    val requestType = getType(c)
+    val requestType = tpe
 //    requestType.decls.foreach(a => println(a))
 //    classSymbol.info.decls.foreach(a => println(a))
 
@@ -32,6 +40,7 @@ object fromXmlTemplate {
     val primCtor = requestType.decls.filter(
       m => m.isMethod && m.asMethod.isPrimaryConstructor).head
 
+
     println(primCtor)
 
     val params = primCtor.typeSignature.paramLists.head
@@ -41,7 +50,6 @@ object fromXmlTemplate {
     val tmp = requestType.typeSymbol.asType.asClass
     val cm = mirror.reflectClass(tmp)
     val applyMethodToCall = cm.reflectConstructor(primCtor.asMethod)
-    val lst = List.fill(params.size)(None)
 //    val res = applyMethodToCall.apply(lst: _*)
 
 //    println(s"Created class ${createdClass.getClass}")
@@ -72,8 +80,9 @@ object fromXmlTemplate {
 //          println("444 " + b) //this will print out methods of option
         })
         //for option
-        println(a.info.typeArgs) //List(Payment)
+        println("It is not an option of string" + a.info.typeArgs) //List(Payment)
         val pymt = a.info.typeArgs.head //just Payment of reflect.Type
+
 //        pymt.members.foreach(a => println("plah" + a)) // all members of Payment
 
         val tstClass =  pymt.typeSymbol.asType.asClass
@@ -94,7 +103,8 @@ object fromXmlTemplate {
 //        else {
           val child = res.getClass.getName
         println("poo: " + child)
-          val plah = fromXML(res.getClass, elem \ {child})
+         val c = typeToClassTag[T]
+          val plah = fromXML(/*res.getClass,*/ elem \ {child})(fromTypeToTyeTag(pymt), c)
 //        }
         paramList += Some(plah)
 
@@ -123,20 +133,36 @@ object fromXmlTemplate {
           val t = elem \ {
             attr
           }
+          if (t.size == 0)
+            paramList +=None
+            else
           paramList += Some(t)
-          println(s"Adding to paramlist ${t}")
+          println(s"Adding to ${a.name.toString} paramlist ${t}")
 
         }
 
         null
-      }
+      } // end else it is a string
     }) //end huge loop around to level object
 //    println("End function Created Class " + createdClass.getClass)
     println(s"ListBuffer: ${paramList.toList}")
-    applyMethodToCall.apply(paramList.toList: _*).asInstanceOf[XMLTextTemplate]
+    applyMethodToCall.apply(paramList.toList: _*).asInstanceOf[T]
 //    createdClass.asInstanceOf[XMLTextTemplate]
   }
 
   def getType[T](clazz: Class[T]) =
-    ru.runtimeMirror(clazz.getClassLoader).classSymbol(clazz).toType
+    mirror.classSymbol(clazz).toType
+
+  //    ru.runtimeMirror(clazz.getClassLoader).classSymbol(clazz).toType
+
+  def fromTypeToTyeTag[T](tpe: Type): TypeTag[T] =
+    TypeTag(mirror, new api.TypeCreator {
+      def apply[U <: api.Universe with Singleton](m: api.Mirror[U]) =
+        if (m eq mirror) tpe.asInstanceOf[U#Type]
+        else throw new IllegalArgumentException(s"Type tag defined in $mirror cannot be migrated to other mirrors.")
+    })
+
+  def typeToClassTag[T: TypeTag]: ClassTag[T] = {
+    ClassTag[T](typeTag[T].mirror.runtimeClass(typeTag[T].tpe))
+  }
 }
