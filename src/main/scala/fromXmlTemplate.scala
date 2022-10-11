@@ -15,8 +15,6 @@ object fromXmlTemplate {
     //convert a type tag to a type
     val requestType = t.tpe
 
-    //just pring out the params for case class
-    requestType.decls.foreach(a => {
 
 
     /**
